@@ -2,25 +2,41 @@ module UKF
 
 using LinearAlgebra
 
-function unscented_transform(x, P)
+function predict(f, μ, P, u, Q)
     # constants
-    n = length(x)
+    n = length(μ)
     λ = 3 - n
 
-    # weights
-    mean_weights = 1 / (2 * (n + λ)) * ones(2 * n + 1)
-    mean_weights[1] = λ / (n + λ)
-
-    cov_weights = diagm(mean_weights)
-
-    # sigma points
+    # auxilary sigma points
     S = cholesky(P).L
-    positive = map(s -> x + sqrt(n + λ) * s, eachcol(S))
-    negative = map(s -> x - sqrt(n + λ) * s, eachcol(S))
+    positive = map(s -> μ + sqrt(n + λ) * s, eachcol(S))
+    negative = map(s -> μ - sqrt(n + λ) * s, eachcol(S))
 
-    return vcat([x], positive, negative), mean_weights, cov_weights
+    # state propagation
+    x0 = f(μ, u)
+    map(x -> x .= f(x, u), positive)
+    map(x -> x .= f(x, u), negative)
+
+    # new mean
+    w_0 = λ / (n + λ)
+    w_i = 1 / (2 * (n + λ))
+
+    new_μ = w_0 * x0
+    new_μ += mapreduce(x -> w_i * x, +, positive)
+    new_μ += mapreduce(x -> w_i * x, +, negative)
+
+    # (in-place) deviations from the new mean
+    x0 .= x0 - new_μ
+    map(x -> x .= x - new_μ, positive)
+    map(x -> x .= x - new_μ, negative)
+
+    # new state error covariance
+    new_P = x0 * x0'
+    new_P += mapreduce(d -> d * d', +, positive)
+    new_P += mapreduce(d -> d * d', +, negative)
+    new_P += Q
+
+    return new_μ, new_P
 end
-
-odd_even_direction(i::Int) = (i % 2 == 0) ? 1 : -1
 
 end # module UKF
