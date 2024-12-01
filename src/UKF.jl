@@ -2,45 +2,48 @@ module UKF
 
 using LinearAlgebra
 using Debugger
+using Infiltrator
 
 function predict(f, μ, P, u, Q)
     # constants
     n = length(μ)
-    λ = 3 - n
+    λ = 2
+    α = 1
+    β = 0
 
-    # auxilary sigma points
+    # unscented transform
     S = cholesky(P).L
+
     positive = map(s -> μ + sqrt(n + λ) * s, eachcol(S))
     negative = map(s -> μ - sqrt(n + λ) * s, eachcol(S))
-    auxilary = vcat(positive, negative)
+
+    points = hcat(μ, positive..., negative...)
+
+    w_μ = 1 / (2 * (n + λ)) * ones(2 * n + 1)
+    w_μ[1] = λ / (n + λ)
+
+    w_Σ = diagm(w_μ)
+    w_Σ[1,1] += 1 - α^2 + β
 
     # state propagation
-    central = f(μ, u)
-    map(x -> x .= f(x, u), auxilary)
+    map(x -> x .= f(x, u), eachcol(points))
 
-    # new mean
-    w_0 = λ / (n + λ)
-    w_i = 1 / (2 * (n + λ))
+    # inverse unscented transform
+    new_μ = points * w_μ 
 
-    new_μ = w_0 * central
-    new_μ += mapreduce(x -> w_i * x, +, auxilary)
+    deviations = mapreduce(x -> x - new_μ, hcat, eachcol(points))
+    new_P = deviations * w_Σ * deviations' + Q
 
-    # (in-place) deviations from the new mean
-    central .= central - new_μ
-    map(x -> x .= x - new_μ, auxilary)
-
-    # new state error covariance
-    new_P = w_0 * central * central'
-    new_P += mapreduce(d -> w_i * d * d', +, auxilary)
-    new_P += Q
-
-    return new_μ, new_P
+    # @infiltrate
+    return new_μ, 0.5 * new_P * new_P'
 end
 
 function update(h, μ, P, z, R)
     # constants
     n = length(μ)
-    λ = 3 - n
+    λ = 2
+    α = 1
+    β = 0
 
     # auxilary sigma points
     S = cholesky(P).L

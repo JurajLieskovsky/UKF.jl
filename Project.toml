@@ -5,8 +5,10 @@ version = "0.1.0"
 
 [deps]
 Debugger = "31a5f54b-26ea-5ae9-a837-f05ce5417438"
+Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
 Debugger = "0.7.10"
+Infiltrator = "1.8.3"
 LinearAlgebra = "1.11.0"
