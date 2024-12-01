@@ -2,3 +2,9 @@ name = "UKF"
 uuid = "881e0322-98f6-4d75-bd72-33b54f43ab40"
 authors = ["Juraj Lieskovský <lieskovsky.juraj@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[compat]
+LinearAlgebra = "1.11.0"
