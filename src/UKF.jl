@@ -3,39 +3,52 @@ module UKF
 using LinearAlgebra
 using Debugger
 using Infiltrator
+using BenchmarkTools
+
+
+struct SigmaPoint
+    val::AbstractArray
+    w_μ::Number
+    w_Σ::Number
+end
+
+function unscented_transform(μ, Σ, λ=2, α=1, β=0)
+    n = length(μ)
+
+    # weights
+    w_μi = 1 / (2 * (n + λ))
+    w_μ0 = λ / (n + λ)
+    w_Σi = w_μ0
+    w_Σ0 = w_μi + 1 - α^2 + β
+
+    # points
+    central = SigmaPoint(copy(μ), w_μ0, w_Σ0)
+
+    S = cholesky(Σ).L
+    positive = map(s -> SigmaPoint(μ + sqrt(n + λ) * s, w_μi, w_Σi), eachcol(S))
+    negative = map(s -> SigmaPoint(μ - sqrt(n + λ) * s, w_μi, w_Σi), eachcol(S))
+
+    return vcat([central], positive, negative)
+end
+
+function inverse_unscented_transform(sigma_points)
+    μ = mapreduce(pt -> pt.val * pt.w_μ, +, sigma_points)
+    Σ = mapreduce(pt -> (pt.val - μ) * pt.w_Σ * (pt.val - μ)', +, sigma_points)
+    return μ, Σ
+end
+
 
 function predict(f, μ, P, u, Q)
-    # constants
-    n = length(μ)
-    λ = 2
-    α = 1
-    β = 0
+    # seed sigma points
+    sigma_points = unscented_transform(μ, P)
 
-    # unscented transform
-    S = cholesky(P).L
+    # propagate sigma points through dynamics
+    map(x -> x.val .= f(x.val, u), sigma_points) 
 
-    positive = map(s -> μ + sqrt(n + λ) * s, eachcol(S))
-    negative = map(s -> μ - sqrt(n + λ) * s, eachcol(S))
+    # calculate new mean and covariance
+    new_μ, new_P = inverse_unscented_transform(sigma_points)
 
-    points = hcat(μ, positive..., negative...)
-
-    w_μ = 1 / (2 * (n + λ)) * ones(2 * n + 1)
-    w_μ[1] = λ / (n + λ)
-
-    w_Σ = diagm(w_μ)
-    w_Σ[1,1] += 1 - α^2 + β
-
-    # state propagation
-    map(x -> x .= f(x, u), eachcol(points))
-
-    # inverse unscented transform
-    new_μ = points * w_μ 
-
-    deviations = mapreduce(x -> x - new_μ, hcat, eachcol(points))
-    new_P = deviations * w_Σ * deviations' + Q
-
-    # @infiltrate
-    return new_μ, 0.5 * new_P * new_P'
+    return new_μ, 0.5 * new_P * new_P' + Q
 end
 
 function update(h, μ, P, z, R)
@@ -79,7 +92,7 @@ function update(h, μ, P, z, R)
 
     # state - measurement
     cov_xy = central_state * w_0 * central_meas'
-    cov_xy .+= mapreduce((dx,dy) -> w_i * dx * dy', +, auxilary_states, auxilary_meas)
+    cov_xy .+= mapreduce((dx, dy) -> w_i * dx * dy', +, auxilary_states, auxilary_meas)
 
     # Kalman gain
     K = cov_xy * inv(cov_yy)
