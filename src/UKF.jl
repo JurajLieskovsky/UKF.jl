@@ -88,7 +88,7 @@ function update(h, μ, P, z, R)
     updt_μ = μ - K * (μ_meas - z)
     updt_P = P - K * cov_xy'
 
-    return updt_μ, updt_P
+    return updt_μ, 0.5 * updt_P * updt_P'
 end
 
 end # module UKF
