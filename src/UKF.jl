@@ -39,33 +39,33 @@ function predict(f, μ, P, u, Q)
     map(x -> x.val .= f(x.val, u), sigma_points)
 
     # calculate new mean and covariance
-    μn = mapreduce(x -> x.val * x.w_μ, +, sigma_points)
-    Σn = mapreduce(x -> (x.val - μn) * x.w_Σ * (x.val - μn)', +, sigma_points)
+    μ_new = mapreduce(x -> x.val * x.w_μ, +, sigma_points)
+    Σ_new = mapreduce(x -> (x.val - μ_new) * x.w_Σ * (x.val - μ_new)', +, sigma_points) + Q
 
-    return μn, 0.5 * Σn * Σn' + Q
+    return μ_new, 0.5 * Σ_new * Σ_new'
 end
 
 function update(h, μ, P, z, R)
     # seed sigma points
-    sigma_states = unscented_transform(μ, P)
+    sigma_x = unscented_transform(μ, P)
 
     # propagate sigma points through measurements
-    sigma_meas = map(x -> SigmaPoint(h(x.val), x.w_μ, x.w_Σ), sigma_states)
+    sigma_y = map(x -> SigmaPoint(h(x.val), x.w_μ, x.w_Σ), sigma_x)
 
     # calculate new mean and covariances
-    μ_meas = mapreduce(y -> y.val * y.w_μ, +, sigma_meas)
+    μ_y = mapreduce(y -> y.val * y.w_μ, +, sigma_y)
 
-    Σ_yy = mapreduce(y -> (y.val - μ_meas) * y.w_Σ * (y.val - μ_meas)', +, sigma_meas) + R
-    Σ_xy = mapreduce((x, y) -> (x.val - μ) * y.w_Σ * (y.val - μ_meas)', +, sigma_states, sigma_meas)
+    Σ_yy = mapreduce(y -> (y.val - μ_y) * y.w_Σ * (y.val - μ_y)', +, sigma_y) + R
+    Σ_xy = mapreduce((x, y) -> (x.val - μ) * y.w_Σ * (y.val - μ_y)', +, sigma_x, sigma_y)
 
     # Kalman gain
     K = Σ_xy * inv(Σ_yy)
 
     # Updated state estimate
-    μn = μ - K * (μ_meas - z)
-    Σn = P - K * Σ_xy'
+    μ_new = μ - K * (μ_y - z)
+    Σ_new = P - K * Σ_xy'
 
-    return μn, 0.5 * Σn * Σn'
+    return μ_new, 0.5 * Σ_new * Σ_new'
 end
 
 end # module UKF
