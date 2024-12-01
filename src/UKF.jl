@@ -32,10 +32,10 @@ function unscented_transform(μ, Σ, λ=2, α=1, β=0)
 end
 
 function predict(f, μ, P, u, Q)
-    # seed sigma points
+    # sigma points
     sigma_points = unscented_transform(μ, P)
 
-    # propagate sigma points through dynamics
+    # propagation of sigma points through system dynamics
     map(x -> x.val .= f(x.val, u), sigma_points)
 
     # calculate new mean and covariance
@@ -46,13 +46,13 @@ function predict(f, μ, P, u, Q)
 end
 
 function update(h, μ, P, z, R)
-    # seed sigma points
+    # state sigma points
     sigma_x = unscented_transform(μ, P)
 
-    # propagate sigma points through measurements
+    # measurements from sigma points
     sigma_y = map(x -> SigmaPoint(h(x.val), x.w_μ, x.w_Σ), sigma_x)
 
-    # calculate new mean and covariances
+    # new mean and covariances
     μ_y = mapreduce(y -> y.val * y.w_μ, +, sigma_y)
 
     Σ_yy = mapreduce(y -> (y.val - μ_y) * y.w_Σ * (y.val - μ_y)', +, sigma_y) + R
