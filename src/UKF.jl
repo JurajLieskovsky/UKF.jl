@@ -1,6 +1,7 @@
 module UKF
 
 using LinearAlgebra
+using Debugger
 
 function predict(f, μ, P, u, Q)
     # constants
@@ -29,8 +30,8 @@ function predict(f, μ, P, u, Q)
     map(x -> x .= x - new_μ, auxilary)
 
     # new state error covariance
-    new_P = central * central'
-    new_P += mapreduce(d -> d * d', +, auxilary)
+    new_P = w_0 * central * central'
+    new_P += mapreduce(d -> w_i * d * d', +, auxilary)
     new_P += Q
 
     return new_μ, new_P
@@ -69,20 +70,20 @@ function update(h, μ, P, z, R)
 
     # covariances
     ## measurement - measurement
-    cov_yy = central_meas * central_meas'
-    cov_yy += mapreduce(dy -> dy * dy', +, auxilary_meas)
-    cov_yy += R
+    cov_yy = central_meas * w_0 * central_meas'
+    cov_yy .+= mapreduce(dy -> w_i * dy * dy', +, auxilary_meas)
+    cov_yy .+= R
 
     # state - measurement
-    cov_xy = central_state * central_meas'
-    cov_xy += mapreduce((dx,dy) -> dx * dy', +, auxilary_states, auxilary_meas)
+    cov_xy = central_state * w_0 * central_meas'
+    cov_xy .+= mapreduce((dx,dy) -> w_i * dx * dy', +, auxilary_states, auxilary_meas)
 
     # Kalman gain
     K = cov_xy * inv(cov_yy)
 
     # Updated state estimate
     updt_μ = μ - K * (μ_meas - z)
-    updt_P = P - K * cov_yy * K'
+    updt_P = P - K * cov_xy'
 
     return updt_μ, updt_P
 end
