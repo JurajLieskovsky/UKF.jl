@@ -21,7 +21,7 @@ end
 """
 Prediction step for processes with additive noise.
 """
-function predict(f, μx, Σx, μw, Σw, u)
+function predict!(f, μx, Σx, μw, Σw, u)
     # sigma points and their weights
     seeds, w_μ, w_Σ = unscented_transform(μx, Σx)
 
@@ -29,16 +29,19 @@ function predict(f, μx, Σx, μw, Σw, u)
     sigma_points = map(pt -> f(pt, u) + μw, seeds)
 
     # calculate new mean and covariance
-    μ_new = mapreduce((w, pt) -> pt * w, +, w_μ, sigma_points)
-    Σ_new = mapreduce((w, pt) -> (pt - μ_new) * w * (pt - μ_new)', +, w_Σ, sigma_points) + Σw
+    μx .= mapreduce((w, pt) -> pt * w, +, w_μ, sigma_points)
+    Σx .= mapreduce((w, pt) -> (pt - μx) * w * (pt - μx)', +, w_Σ, sigma_points) + Σw
 
-    return μ_new, 0.5 * Σ_new * Σ_new'
+    # ensure symmetry
+    Σx .= 0.5 * (Σx + Σx')
+
+    return nothing
 end
 
 """
 Update for measurements with additive noise.
 """
-function update(h, μx, Σx, μv, Σv, z)
+function update!(h, μx, Σx, μv, Σv, z)
     # state sigma points and sigma point weights
     sigma_x, w_μ, w_Σ = unscented_transform(μx, Σx)
 
@@ -55,9 +58,12 @@ function update(h, μx, Σx, μv, Σv, z)
     K = Σ_xy * inv(Σ_yy)
 
     # Updated state estimate
-    μ_new = μx - K * (μ_y - z)
-    Σ_new = Σx - K * Σ_xy'
+    μx .-= K * (μ_y - z)
+    Σx .-= K * Σ_xy'
 
-    return μ_new, 0.5 * Σ_new * Σ_new'
+    # Ensure symmetry
+    Σx .= 0.5 * (Σx + Σx')
+
+    return return nothing
 end
 

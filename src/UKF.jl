@@ -30,7 +30,7 @@ end
 # Additive unscented transformation, predicion, and update
 include("additive.jl")
 
-# General unscented transformation, predicion, and update
-include("augmented.jl")
+# # General unscented transformation, predicion, and update
+# include("augmented.jl")
 
 end # module UKF
